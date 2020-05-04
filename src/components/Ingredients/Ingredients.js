@@ -52,7 +52,11 @@ const Ingredients = () => {
   }
 
   const removeIngredient = ( ingId ) => {
-    setUserIngredients( prevState => prevState.filter( ing => ing.id !== ingId));
+    fetch(`https://react-hooks-9a19a.firebaseio.com/ingredients/${ingId}.json`, {
+      method: 'DELETE'
+    }).then( resp => {
+      setUserIngredients( prevState => prevState.filter( ing => ing.id !== ingId));
+    })
   }
 
   /**
