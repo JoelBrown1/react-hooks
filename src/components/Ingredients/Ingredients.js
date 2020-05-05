@@ -1,14 +1,60 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useReducer, useEffect, useCallback } from 'react';
 
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
 import Search from './Search';
 import ErrorModal from '../UI/ErrorModal';
 
+/**
+ * create a reducer outside of the component so it 
+ * isn't recreated every render cycle
+ */
+const ingredientReducer = (currentIngredients, action) => {
+  switch (action.type) {
+    case 'SET':
+      return action.ingredients;
+    case 'ADD':
+      return [...currentIngredients, action.ingredient];
+    case 'DELETE':
+      return currentIngredients.filter( ing => ing.id !== action.id);
+    default:
+      throw new Error("ingredientReducer - we should never get here");
+  }
+}
+
+const httpReducer = ( httpState, action ) => {
+  switch(action.type) {
+    case 'SEND':
+      return { loading: true, error: null };
+    case 'RESP':
+      return { ...httpState, loading: false};
+    case 'ERR': 
+    return { loading: false, error: action.errorData };
+    case 'CLEAR':
+      return { ...httpState, error: null };
+    default:
+      throw new Error("errorReducer - we shouldn't get here either");
+  }
+}
+
 const Ingredients = () => {
-  const [ userIngredients, setUserIngredients ] = useState([]);
-  const [ isLoading, setIsLoading ] = useState( false );
-  const [ error , setError ] = useState();
+  /**
+   * useReducer needs the actual reducer (ingredientReducer defined above)
+   * and the initial state - []
+   * it returns an array (userIngredients and a dispatch function)
+   */
+  const [ userIngredients, dispatch ] = useReducer(ingredientReducer, []);
+  
+  /**
+   * http reducer needs to know about the loading state and
+   * if there is an error at some point in the http request
+   */
+  const [ httpState, dispatchHTTP ] = useReducer(httpReducer, { loading: false, error: null });
+
+  // these are all individually managed states - not bad, just could be done with a reducer
+  // const [ userIngredients, setUserIngredients ] = useState([]); - is being managed with the reducer now
+  // const [ isLoading, setIsLoading ] = useState( false );
+  // const [ error , setError ] = useState();
 
   /** 
    * this hook gets called after and for every render cycle
@@ -43,34 +89,45 @@ const Ingredients = () => {
   }, [userIngredients] )
 
   const addIngredientHandler = (ing) => {
-    setIsLoading(true);
-    console.log('value of isLoading: ', isLoading);
+    // setIsLoading(true); - managed by the httpReducer
+    // console.log('value of isLoading: ', isLoading);
+    dispatchHTTP({type: 'SEND'});
     fetch('https://react-hooks-9a19a.firebaseio.com/ingredients.json', {
       method: 'POST',
       body: JSON.stringify(ing),
       headers: {'Content-Type': 'application:json'}
     }).then(resp => {
-      console.log('value of isLoading: ', isLoading);
-      setIsLoading(false);
+      // console.log('value of isLoading: ', isLoading);
+      // setIsLoading(false);
+      dispatchHTTP({type: 'RESP'})
 
       return resp.json();
     }).then(responseData => {
-      setUserIngredients( prevState  => [ ...prevState, {id : responseData.name, ...ing} ] );
+      // setUserIngredients( prevState  => [ ...prevState, {id : responseData.name, ...ing} ] ); - managed by the reducer
+      dispatch({type: 'ADD', ingredient: {id : responseData.name, ...ing}});
     });
   }
 
   const removeIngredient = ( ingId ) => {
-    console.log('value of isLoading: ', isLoading);
-    setIsLoading(true);
-    fetch(`https://react-hooks-9a19a.firebaseio.com/ingredients/${ingId}.jon`, {
+    // console.log('value of isLoading: ', isLoading);
+    // setIsLoading(true);
+    dispatchHTTP({type: 'SEND'});
+
+    fetch(`https://react-hooks-9a19a.firebaseio.com/ingredients/${ingId}.json`, {
       method: 'DELETE'
     }).then( ( resp ) => {
-      console.log('value of isLoading: ', isLoading);
-      setIsLoading(false);
-      setUserIngredients( prevState => prevState.filter( ing => ing.id !== ingId));
+      // console.log('value of isLoading: ', isLoading);
+      // setIsLoading(false);
+      dispatchHTTP({type: 'RESP'});
+
+      // setUserIngredients( prevState => prevState.filter( ing => ing.id !== ingId)); - managed by reducer
+      dispatch({type: 'DELETE', id: ingId});
     }).catch( err => {
-      setError(err.message);
-      console.log("what was the error: ", err)
+      // setError(err.message);
+      dispatchHTTP({type: 'ERR', errorData: err.message});
+
+      console.log("what was the error: ", err);
+      // setIsLoading(false);
     })
   }
 
@@ -78,12 +135,14 @@ const Ingredients = () => {
    * remember - [] maked the hook only run once
    */
   const filterIngredients = useCallback(( data ) => {
-    setUserIngredients( data );
+    // setUserIngredients( data ); - now managed by the rducer
+    dispatch({type: 'SET', ingredients: data});
   }, []);
 
   const clearError = () => {
-    setError(null);
-    setIsLoading(false);
+    dispatchHTTP({type: 'CLEAR'});
+    // setError(null);
+    // setIsLoading(false);
   }
 
 
@@ -91,9 +150,10 @@ const Ingredients = () => {
     <div className="App">
       <IngredientForm 
         onAddIngredient={addIngredientHandler}
-        loading={isLoading}
+        loading={httpState.loading}
       />
-      {error && <ErrorModal onClose={clearError}>{error}</ErrorModal>}
+      { console.log('what is the httpState.error value: ', httpState)}
+      { httpState.error && <ErrorModal onClose={clearError}>{httpState.error}</ErrorModal> }
       <section>
         <Search onLoadedIngredients={filterIngredients}/>
         <IngredientList ingredients={userIngredients} onRemoveItem={removeIngredient}/>
