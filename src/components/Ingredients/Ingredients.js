@@ -1,4 +1,4 @@
-import React, { useState, useReducer, useEffect, useCallback } from 'react';
+import React, { useState, useReducer, useEffect, useCallback, useMemo } from 'react';
 
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
@@ -88,7 +88,7 @@ const Ingredients = () => {
   useEffect( ()=> {
   }, [userIngredients] )
 
-  const addIngredientHandler = (ing) => {
+  const addIngredientHandler = useCallback((ing) => {
     // setIsLoading(true); - managed by the httpReducer
     // console.log('value of isLoading: ', isLoading);
     dispatchHTTP({type: 'SEND'});
@@ -106,9 +106,12 @@ const Ingredients = () => {
       // setUserIngredients( prevState  => [ ...prevState, {id : responseData.name, ...ing} ] ); - managed by the reducer
       dispatch({type: 'ADD', ingredient: {id : responseData.name, ...ing}});
     });
-  }
+  }, []);
 
-  const removeIngredient = ( ingId ) => {
+  /**
+   * Write code so that it still works without useMemo — and then add it to optimize performance!!!!
+   */
+  const removeIngredient = ingId => {
     // console.log('value of isLoading: ', isLoading);
     // setIsLoading(true);
     dispatchHTTP({type: 'SEND'});
@@ -129,7 +132,7 @@ const Ingredients = () => {
       console.log("what was the error: ", err);
       // setIsLoading(false);
     })
-  }
+  };
 
   /**
    * remember - [] maked the hook only run once
@@ -139,11 +142,30 @@ const Ingredients = () => {
     dispatch({type: 'SET', ingredients: data});
   }, []);
 
-  const clearError = () => {
+  /**
+   * useCallback hook works here because the modal 
+   * has used the React.memo wrapper to prevent unrequired renderings
+   */
+  const clearError = useCallback(() => {
     dispatchHTTP({type: 'CLEAR'});
     // setError(null);
     // setIsLoading(false);
-  }
+  }, []);
+
+  /**
+   * not the typical use for this hook,
+   * React.Memo is typical for not recreating a component - see the Error modal
+   * useMemo is used to prevent creating a new value of some expenxive computation
+   * if the values are the same from one render cycle to another
+   */
+  const ingredientList = useMemo(() => {
+    return (
+      <IngredientList 
+        ingredients={userIngredients} 
+        onRemoveItem={removeIngredient}
+      />
+    )
+  }, [userIngredients, removeIngredient]);
 
 
   return (
@@ -156,7 +178,7 @@ const Ingredients = () => {
       { httpState.error && <ErrorModal onClose={clearError}>{httpState.error}</ErrorModal> }
       <section>
         <Search onLoadedIngredients={filterIngredients}/>
-        <IngredientList ingredients={userIngredients} onRemoveItem={removeIngredient}/>
+        { ingredientList }
       </section>
     </div>
   );

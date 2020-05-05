@@ -2,7 +2,16 @@ import React from 'react';
 
 import './IngredientList.css';
 
+/**
+ * React.memo( props => { function body logic goes here }
+ * React.memo - define "memo"
+ * 
+ * must be used along with useCallback hook where the data is changed
+ * (in this case, delete an ingredient)
+ */
 const IngredientList = props => {
+  console.log("building the ingredient list");
+  debugger;
 
   return (
     <section className="ingredient-list">
