@@ -11,7 +11,6 @@ import './IngredientList.css';
  */
 const IngredientList = props => {
   console.log("building the ingredient list");
-  debugger;
 
   return (
     <section className="ingredient-list">
