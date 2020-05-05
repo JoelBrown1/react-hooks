@@ -18,7 +18,22 @@ const ingredientReducer = (currentIngredients, action) => {
     case 'DELETE':
       return currentIngredients.filter( ing => ing.id !== action.id);
     default:
-      throw new Error("we should never get here");
+      throw new Error("ingredientReducer - we should never get here");
+  }
+}
+
+const httpReducer = ( httpState, action ) => {
+  switch(action.type) {
+    case 'SEND':
+      return { loading: true, error: null };
+    case 'RESP':
+      return { ...httpState, loading: false};
+    case 'ERR': 
+    return { loading: false, error: action.errorData };
+    case 'CLEAR':
+      return { ...httpState, error: null };
+    default:
+      throw new Error("errorReducer - we shouldn't get here either");
   }
 }
 
@@ -29,11 +44,17 @@ const Ingredients = () => {
    * it returns an array (userIngredients and a dispatch function)
    */
   const [ userIngredients, dispatch ] = useReducer(ingredientReducer, []);
+  
+  /**
+   * http reducer needs to know about the loading state and
+   * if there is an error at some point in the http request
+   */
+  const [ httpState, dispatchHTTP ] = useReducer(httpReducer, { loading: false, error: null });
 
   // these are all individually managed states - not bad, just could be done with a reducer
   // const [ userIngredients, setUserIngredients ] = useState([]); - is being managed with the reducer now
-  const [ isLoading, setIsLoading ] = useState( false );
-  const [ error , setError ] = useState();
+  // const [ isLoading, setIsLoading ] = useState( false );
+  // const [ error , setError ] = useState();
 
   /** 
    * this hook gets called after and for every render cycle
@@ -68,15 +89,17 @@ const Ingredients = () => {
   }, [userIngredients] )
 
   const addIngredientHandler = (ing) => {
-    setIsLoading(true);
-    console.log('value of isLoading: ', isLoading);
+    // setIsLoading(true); - managed by the httpReducer
+    // console.log('value of isLoading: ', isLoading);
+    dispatchHTTP({type: 'SEND'});
     fetch('https://react-hooks-9a19a.firebaseio.com/ingredients.json', {
       method: 'POST',
       body: JSON.stringify(ing),
       headers: {'Content-Type': 'application:json'}
     }).then(resp => {
-      console.log('value of isLoading: ', isLoading);
-      setIsLoading(false);
+      // console.log('value of isLoading: ', isLoading);
+      // setIsLoading(false);
+      dispatchHTTP({type: 'RESP'})
 
       return resp.json();
     }).then(responseData => {
@@ -86,20 +109,25 @@ const Ingredients = () => {
   }
 
   const removeIngredient = ( ingId ) => {
-    console.log('value of isLoading: ', isLoading);
-    setIsLoading(true);
+    // console.log('value of isLoading: ', isLoading);
+    // setIsLoading(true);
+    dispatchHTTP({type: 'SEND'});
+
     fetch(`https://react-hooks-9a19a.firebaseio.com/ingredients/${ingId}.json`, {
       method: 'DELETE'
     }).then( ( resp ) => {
-      console.log('value of isLoading: ', isLoading);
-      setIsLoading(false);
+      // console.log('value of isLoading: ', isLoading);
+      // setIsLoading(false);
+      dispatchHTTP({type: 'RESP'});
 
       // setUserIngredients( prevState => prevState.filter( ing => ing.id !== ingId)); - managed by reducer
       dispatch({type: 'DELETE', id: ingId});
     }).catch( err => {
-      setError(err.message);
-      console.log("what was the error: ", err)
-      setIsLoading(false);
+      // setError(err.message);
+      dispatchHTTP({type: 'ERR', errorData: err.message});
+
+      console.log("what was the error: ", err);
+      // setIsLoading(false);
     })
   }
 
@@ -112,8 +140,9 @@ const Ingredients = () => {
   }, []);
 
   const clearError = () => {
-    setError(null);
-    setIsLoading(false);
+    dispatchHTTP({type: 'CLEAR'});
+    // setError(null);
+    // setIsLoading(false);
   }
 
 
@@ -121,9 +150,10 @@ const Ingredients = () => {
     <div className="App">
       <IngredientForm 
         onAddIngredient={addIngredientHandler}
-        loading={isLoading}
+        loading={httpState.loading}
       />
-      {error && <ErrorModal onClose={clearError}>{error}</ErrorModal>}
+      { console.log('what is the httpState.error value: ', httpState)}
+      { httpState.error && <ErrorModal onClose={clearError}>{httpState.error}</ErrorModal> }
       <section>
         <Search onLoadedIngredients={filterIngredients}/>
         <IngredientList ingredients={userIngredients} onRemoveItem={removeIngredient}/>
