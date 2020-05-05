@@ -1,12 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useReducer, useEffect, useCallback } from 'react';
 
 import IngredientForm from './IngredientForm';
 import IngredientList from './IngredientList';
 import Search from './Search';
 import ErrorModal from '../UI/ErrorModal';
 
+/**
+ * create a reducer outside of the component so it 
+ * isn't recreated every render cycle
+ */
+const ingredientReducer = (currentIngredients, action) => {
+  switch (action.type) {
+    case 'SET':
+      return action.ingredients;
+    case 'ADD':
+      return [...currentIngredients, action.ingredient];
+    case 'DELETE':
+      return currentIngredients.filter( ing => ing.id !== action.id);
+    default:
+      throw new Error("we should never get here");
+  }
+}
+
 const Ingredients = () => {
-  const [ userIngredients, setUserIngredients ] = useState([]);
+  /**
+   * useReducer needs the actual reducer (ingredientReducer defined above)
+   * and the initial state - []
+   * it returns an array (userIngredients and a dispatch function)
+   */
+  const [ userIngredients, dispatch ] = useReducer(ingredientReducer, []);
+
+  // these are all individually managed states - not bad, just could be done with a reducer
+  // const [ userIngredients, setUserIngredients ] = useState([]); - is being managed with the reducer now
   const [ isLoading, setIsLoading ] = useState( false );
   const [ error , setError ] = useState();
 
@@ -55,22 +80,26 @@ const Ingredients = () => {
 
       return resp.json();
     }).then(responseData => {
-      setUserIngredients( prevState  => [ ...prevState, {id : responseData.name, ...ing} ] );
+      // setUserIngredients( prevState  => [ ...prevState, {id : responseData.name, ...ing} ] ); - managed by the reducer
+      dispatch({type: 'ADD', ingredient: {id : responseData.name, ...ing}});
     });
   }
 
   const removeIngredient = ( ingId ) => {
     console.log('value of isLoading: ', isLoading);
     setIsLoading(true);
-    fetch(`https://react-hooks-9a19a.firebaseio.com/ingredients/${ingId}.jon`, {
+    fetch(`https://react-hooks-9a19a.firebaseio.com/ingredients/${ingId}.json`, {
       method: 'DELETE'
     }).then( ( resp ) => {
       console.log('value of isLoading: ', isLoading);
       setIsLoading(false);
-      setUserIngredients( prevState => prevState.filter( ing => ing.id !== ingId));
+
+      // setUserIngredients( prevState => prevState.filter( ing => ing.id !== ingId)); - managed by reducer
+      dispatch({type: 'DELETE', id: ingId});
     }).catch( err => {
       setError(err.message);
       console.log("what was the error: ", err)
+      setIsLoading(false);
     })
   }
 
@@ -78,7 +107,8 @@ const Ingredients = () => {
    * remember - [] maked the hook only run once
    */
   const filterIngredients = useCallback(( data ) => {
-    setUserIngredients( data );
+    // setUserIngredients( data ); - now managed by the rducer
+    dispatch({type: 'SET', ingredients: data});
   }, []);
 
   const clearError = () => {
